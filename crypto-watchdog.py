@@ -1,58 +1,38 @@
-from telegram import Update
+from flask import Flask
+from telegram import Update, Bot
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import requests
-from flask import Flask
-import threading
 
 BOT_TOKEN = "7863509137:AAHBuRbtzMAOM_yBbVZASfx-oORubvQYxY8"
 ALLOWED_USERS = [7863509137]
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id in ALLOWED_USERS:
-        await update.message.reply_text("أهلاً بك في بوت مراقبة العملات الرقمية! اكتب /crypto BTC أو /top.")
-    else:
-        await update.message.reply_text("غير مصرح لك باستخدام هذا البوت.")
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Crypto Watchdog is running!"
 
 async def crypto(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ALLOWED_USERS:
-        return
-    if len(context.args) != 1:
-        await update.message.reply_text("اكتب الأمر بهذا الشكل: /crypto BTC")
+    if update.effective_user.id not in ALLOWED_USERS:[7863509137]
+        await update.message.reply_text("Access denied.")
         return
 
-    symbol = context.args[0].lower()
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol}&vs_currencies=usd"
+    if not context.args:
+        await update.message.reply_text("Usage: /crypto bitcoin")
+        return
+
+    coin = context.args[0].lower()
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd"
 
     try:
-        res = requests.get(url)
-        data = res.json()
-        price = data[symbol]["usd"]
-        await update.message.reply_text(f"سعر {symbol.upper()} الآن: ${price}")
+        response = requests.get(url).json()
+        price = response[coin]["usd"]
+        await update.message.reply_text(f"{coin.capitalize()} price: ${price}")
     except:
-        await update.message.reply_text("تعذر الحصول على السعر. تأكد من الرمز.")
+        await update.message.reply_text("Invalid coin or error fetching data.")
 
-async def top(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in ALLOWED_USERS:
-        return
-    url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=5&page=1"
-    res = requests.get(url)
-    data = res.json()
-    msg = "🔝 أعلى 5 عملات:\n"
-    for coin in data:
-        msg += f"{coin['name']} ({coin['symbol'].upper()}): ${coin['current_price']}\n"
-    await update.message.reply_text(msg)
-
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("crypto", crypto))
-app.add_handler(CommandHandler("top", top))
-
-def run_flask():
-    flask_app = Flask(__name__)
-    @flask_app.route('/')
-    def index():
-        return "Crypto Bot is running!"
-    flask_app.run(host="0.0.0.0", port=10000)
-
-threading.Thread(target=run_flask).start()
-app.run_polling()
+if __name__ == "__main__":
+    bot_app = ApplicationBuilder().token(BOT_TOKEN).build()
+    bot_app.add_handler(CommandHandler("crypto", crypto))
+    bot_app.run_polling()
+    app.run(host="0.0.0.0", port=10000)
